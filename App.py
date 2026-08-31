@@ -1052,109 +1052,1030 @@ st.dataframe(
 
 
 # ============================================================
-# 26. REPORT EXPORT
+# 26. INDIGO INSTITUTIONAL EXECUTIVE REPORT
 # ============================================================
 
-st.header(
-    "Report Export"
+st.header("Indigo Institutional Intelligence Report")
+
+
+# ------------------------------------------------------------
+# 26.1 Helper functions
+# ------------------------------------------------------------
+
+def fmt_pct(value):
+    """Format decimal as percentage."""
+    if pd.isna(value):
+        return "N/A"
+    return f"{value:.2%}"
+
+
+def fmt_score(value):
+    """Format score."""
+    if pd.isna(value):
+        return "N/A"
+    return f"{value:.1f}/100"
+
+
+def classify_drawdown(value):
+    """Classify drawdown severity."""
+    value = abs(float(value))
+
+    if value >= 0.30:
+        return "Severe"
+    elif value >= 0.20:
+        return "Material"
+    elif value >= 0.10:
+        return "Moderate"
+    else:
+        return "Contained"
+
+
+def classify_volatility(value):
+    """Classify annualised volatility."""
+    value = float(value)
+
+    if value >= 0.40:
+        return "Very High"
+    elif value >= 0.25:
+        return "High"
+    elif value >= 0.15:
+        return "Moderate"
+    else:
+        return "Low"
+
+
+def classify_concentration(value):
+    """Classify top-five risk concentration."""
+    value = float(value)
+
+    if value >= 0.80:
+        return "Very High"
+    elif value >= 0.70:
+        return "High"
+    elif value >= 0.50:
+        return "Moderate"
+    else:
+        return "Contained"
+
+
+def classify_liquidity(value):
+    """Classify liquidity stress."""
+    value = float(value)
+
+    if value >= 75:
+        return "Severe"
+    elif value >= 50:
+        return "Elevated"
+    elif value >= 25:
+        return "Moderate"
+    else:
+        return "Contained"
+
+
+# ------------------------------------------------------------
+# 26.2 Extract core metrics safely
+# ------------------------------------------------------------
+
+total_return = performance.get(
+    "total_return",
+    np.nan
 )
 
-executive_report = pd.DataFrame({
+annualized_return = performance.get(
+    "annualized_return",
+    np.nan
+)
 
-    "Metric": [
+annualized_volatility = performance.get(
+    "annualized_volatility",
+    np.nan
+)
 
-        "Portfolio Total Return",
+maximum_drawdown = performance.get(
+    "maximum_drawdown",
+    np.nan
+)
 
-        "Annualized Return",
+current_drawdown = performance.get(
+    "current_drawdown",
+    np.nan
+)
 
-        "Annualized Volatility",
+liquidity_score = executive.get(
+    "liquidity_score",
+    np.nan
+)
+
+top_5_risk_share = executive.get(
+    "top_5_risk_share",
+    np.nan
+)
+
+average_absolute_correlation = executive.get(
+    "average_absolute_correlation",
+    np.nan
+)
+
+active_alert_count = executive.get(
+    "active_alerts",
+    0
+)
+
+critical_alert_count = executive.get(
+    "critical_alerts",
+    0
+)
+
+high_alert_count = executive.get(
+    "high_alerts",
+    0
+)
+
+portfolio_status = executive.get(
+    "portfolio_alert_status",
+    "MONITOR"
+)
+
+
+# ------------------------------------------------------------
+# 26.3 Derived assessments
+# ------------------------------------------------------------
+
+drawdown_assessment = classify_drawdown(
+    maximum_drawdown
+)
+
+volatility_assessment = classify_volatility(
+    annualized_volatility
+)
+
+concentration_assessment = classify_concentration(
+    top_5_risk_share
+)
+
+liquidity_assessment = classify_liquidity(
+    liquidity_score
+)
+
+
+# ------------------------------------------------------------
+# 26.4 Determine principal structural concern
+# ------------------------------------------------------------
+
+risk_factors = {
+    "Portfolio concentration":
+        top_5_risk_share
+        if pd.notna(top_5_risk_share)
+        else 0,
+
+    "Maximum drawdown":
+        abs(maximum_drawdown)
+        if pd.notna(maximum_drawdown)
+        else 0,
+
+    "Annualised volatility":
+        annualized_volatility
+        if pd.notna(annualized_volatility)
+        else 0,
+
+    "Liquidity stress":
+        liquidity_score / 100
+        if pd.notna(liquidity_score)
+        else 0
+}
+
+principal_risk = max(
+    risk_factors,
+    key=risk_factors.get
+)
+
+
+# ------------------------------------------------------------
+# 26.5 Executive Assessment
+# ------------------------------------------------------------
+
+st.subheader(
+    "1. Executive Assessment"
+)
+
+if portfolio_status == "CRITICAL ATTENTION REQUIRED":
+
+    assessment_icon = "🔴"
+
+elif portfolio_status == "HIGH ATTENTION":
+
+    assessment_icon = "🟠"
+
+elif portfolio_status == "MONITOR":
+
+    assessment_icon = "🟡"
+
+else:
+
+    assessment_icon = "🟢"
+
+
+st.markdown(
+    f"""
+### {assessment_icon} Portfolio Status: {portfolio_status}
+"""
+)
+
+
+assessment_text = (
+    f"The portfolio generated a total return of "
+    f"**{fmt_pct(total_return)}** over the analysis period, "
+    f"with annualised volatility of "
+    f"**{fmt_pct(annualized_volatility)}**, classified as "
+    f"**{volatility_assessment.lower()}**. "
+)
+
+if pd.notna(maximum_drawdown):
+
+    assessment_text += (
+        f"Maximum drawdown reached "
+        f"**{fmt_pct(maximum_drawdown)}**, representing a "
+        f"**{drawdown_assessment.lower()}** level of downside exposure. "
+    )
+
+if pd.notna(top_5_risk_share):
+
+    assessment_text += (
+        f"The five largest risk contributors account for "
+        f"**{fmt_pct(top_5_risk_share)}** of portfolio risk, "
+        f"indicating **{concentration_assessment.lower()} "
+        f"risk concentration**. "
+    )
+
+if pd.notna(liquidity_score):
+
+    assessment_text += (
+        f"Portfolio liquidity stress is assessed at "
+        f"**{fmt_score(liquidity_score)}**, indicating "
+        f"**{liquidity_assessment.lower()} liquidity pressure**. "
+    )
+
+
+st.write(
+    assessment_text
+)
+
+
+# ------------------------------------------------------------
+# 26.6 Core Risk Dashboard
+# ------------------------------------------------------------
+
+st.subheader(
+    "2. Performance & Risk Assessment"
+)
+
+report_metric_1, report_metric_2, report_metric_3, report_metric_4 = (
+    st.columns(4)
+)
+
+report_metric_1.metric(
+    "Total Return",
+    fmt_pct(total_return)
+)
+
+report_metric_2.metric(
+    "Annualised Return",
+    fmt_pct(annualized_return)
+)
+
+report_metric_3.metric(
+    "Annualised Volatility",
+    fmt_pct(annualized_volatility)
+)
+
+report_metric_4.metric(
+    "Maximum Drawdown",
+    fmt_pct(maximum_drawdown)
+)
+
+
+risk_assessment_table = pd.DataFrame({
+
+    "Risk Dimension": [
+
+        "Volatility",
 
         "Maximum Drawdown",
 
-        "Current Drawdown",
+        "Risk Concentration",
 
-        "Portfolio Liquidity Stress",
+        "Liquidity Stress",
 
-        "Top 5 Risk Concentration",
-
-        "Average Absolute Correlation",
-
-        "Active Alerts",
-
-        "Critical Alerts",
-
-        "High Alerts",
-
-        "Portfolio Alert Status"
+        "Average Absolute Correlation"
     ],
 
-    "Value": [
+    "Observed Value": [
 
-        performance[
-            "total_return"
-        ],
+        fmt_pct(annualized_volatility),
 
-        performance[
-            "annualized_return"
-        ],
+        fmt_pct(maximum_drawdown),
 
-        performance[
-            "annualized_volatility"
-        ],
+        fmt_pct(top_5_risk_share),
 
-        performance[
-            "maximum_drawdown"
-        ],
+        fmt_score(liquidity_score),
 
-        performance[
-            "current_drawdown"
-        ],
+        fmt_pct(
+            average_absolute_correlation
+        )
+    ],
 
-        executive[
-            "liquidity_score"
-        ],
+    "Assessment": [
 
-        executive[
-            "top_5_risk_share"
-        ],
+        volatility_assessment,
 
-        executive[
-            "average_absolute_correlation"
-        ],
+        drawdown_assessment,
 
-        executive[
-            "active_alerts"
-        ],
+        concentration_assessment,
 
-        executive[
-            "critical_alerts"
-        ],
+        liquidity_assessment,
 
-        executive[
-            "high_alerts"
-        ],
-
-        executive[
-            "portfolio_alert_status"
-        ]
+        (
+            "Elevated"
+            if average_absolute_correlation >= 0.50
+            else
+            "Moderate"
+            if average_absolute_correlation >= 0.30
+            else
+            "Contained"
+        )
     ]
 })
 
 
+st.dataframe(
+    risk_assessment_table,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# ------------------------------------------------------------
+# 26.7 Structural Risk
+# ------------------------------------------------------------
+
+st.subheader(
+    "3. Structural Risk Assessment"
+)
+
+st.markdown(
+    f"""
+**Principal structural concern: {principal_risk}**
+"""
+)
+
+
+if concentration_assessment in [
+    "High",
+    "Very High"
+]:
+
+    st.warning(
+        f"Portfolio risk is materially concentrated. "
+        f"The five largest contributors represent "
+        f"{fmt_pct(top_5_risk_share)} of total portfolio risk. "
+        f"This creates sensitivity to a relatively small "
+        f"number of underlying positions."
+    )
+
+else:
+
+    st.success(
+        "Portfolio risk concentration is currently "
+        "within a relatively contained range."
+    )
+
+
+# ------------------------------------------------------------
+# 26.8 Top Risk Contributors
+# ------------------------------------------------------------
+
+st.markdown(
+    "**Largest Contributors to Portfolio Risk**"
+)
+
+top_risk_table = (
+    risk_contribution
+    .sort_values(
+        "Risk_Contribution",
+        ascending=False
+    )
+    .head(10)
+    .copy()
+)
+
+if not top_risk_table.empty:
+
+    display_top_risk = top_risk_table.copy()
+
+    if "Weight" in display_top_risk.columns:
+
+        display_top_risk[
+            "Weight"
+        ] = display_top_risk[
+            "Weight"
+        ].map(
+            lambda x:
+            f"{x:.2%}"
+        )
+
+    if "Risk_Contribution" in display_top_risk.columns:
+
+        display_top_risk[
+            "Risk_Contribution"
+        ] = display_top_risk[
+            "Risk_Contribution"
+        ].map(
+            lambda x:
+            f"{x:.2%}"
+        )
+
+    if "Risk_Multiple" in display_top_risk.columns:
+
+        display_top_risk[
+            "Risk_Multiple"
+        ] = display_top_risk[
+            "Risk_Multiple"
+        ].map(
+            lambda x:
+            f"{x:.2f}x"
+        )
+
+    st.dataframe(
+        display_top_risk,
+        use_container_width=True
+    )
+
+
+# ------------------------------------------------------------
+# 26.9 Liquidity Assessment
+# ------------------------------------------------------------
+
+st.subheader(
+    "4. Liquidity & Market Stress"
+)
+
+liquidity_text = (
+    f"Portfolio liquidity stress is currently assessed "
+    f"at **{fmt_score(liquidity_score)}**. "
+)
+
+if liquidity_assessment == "Contained":
+
+    liquidity_text += (
+        "Current liquidity conditions do not represent "
+        "a primary portfolio-level concern."
+    )
+
+elif liquidity_assessment == "Moderate":
+
+    liquidity_text += (
+        "Liquidity conditions warrant monitoring, "
+        "particularly during periods of elevated market stress."
+    )
+
+elif liquidity_assessment == "Elevated":
+
+    liquidity_text += (
+        "Liquidity conditions represent a meaningful "
+        "risk consideration for portfolio management."
+    )
+
+else:
+
+    liquidity_text += (
+        "Liquidity conditions represent a significant "
+        "portfolio-level risk requiring close attention."
+    )
+
+
+st.write(
+    liquidity_text
+)
+
+
+# ------------------------------------------------------------
+# 26.10 Liquidity Priorities
+# ------------------------------------------------------------
+
+if (
+    "priorities"
+    in portfolio_liquidity
+):
+
+    liquidity_priorities = (
+        portfolio_liquidity[
+            "priorities"
+        ]
+    )
+
+    if isinstance(
+        liquidity_priorities,
+        pd.DataFrame
+    ) and not liquidity_priorities.empty:
+
+        st.markdown(
+            "**Assets requiring the greatest liquidity attention**"
+        )
+
+        st.dataframe(
+            liquidity_priorities,
+            use_container_width=True
+        )
+
+
+# ------------------------------------------------------------
+# 26.11 Market Intelligence Alerts
+# ------------------------------------------------------------
+
+st.subheader(
+    "5. Intelligence Alerts"
+)
+
+if active_alert_count == 0:
+
+    st.success(
+        "No active intelligence alerts were identified "
+        "by the current monitoring framework."
+    )
+
+else:
+
+    st.warning(
+        f"{active_alert_count} active intelligence "
+        f"alert(s) currently require monitoring."
+    )
+
+    if (
+        isinstance(
+            active_alerts,
+            pd.DataFrame
+        )
+        and not active_alerts.empty
+    ):
+
+        alert_export = (
+            active_alerts
+            .copy()
+        )
+
+        st.dataframe(
+            alert_export,
+            use_container_width=True
+        )
+
+
+# ------------------------------------------------------------
+# 26.12 Principal Risks
+# ------------------------------------------------------------
+
+st.subheader(
+    "6. Principal Risks"
+
+)
+
+principal_risks = executive.get(
+    "principal_risks",
+    []
+)
+
+if principal_risks:
+
+    for risk in principal_risks:
+
+        st.markdown(
+            f"- {risk}"
+        )
+
+else:
+
+    st.write(
+        "No principal risks were returned by the engine."
+    )
+
+
+# ------------------------------------------------------------
+# 26.13 Decision Attention Queue
+# ------------------------------------------------------------
+
+st.subheader(
+    "7. Decision-Attention Queue"
+)
+
+decision_actions = executive.get(
+    "decision_actions",
+    []
+)
+
+if decision_actions:
+
+    for action in decision_actions:
+
+        st.markdown(
+            f"- {action}"
+        )
+
+else:
+
+    st.write(
+        "No immediate decision-attention items were generated."
+    )
+
+
+# ------------------------------------------------------------
+# 26.14 Institutional Conclusion
+# ------------------------------------------------------------
+
+st.subheader(
+    "8. Institutional Conclusion"
+)
+
+if principal_risk == "Portfolio concentration":
+
+    conclusion = (
+        "The principal issue identified by the current "
+        "intelligence framework is portfolio concentration. "
+        "The portfolio's overall risk profile is being driven "
+        "disproportionately by a limited number of positions. "
+        "Institutional attention should therefore focus on "
+        "risk concentration, diversification and the "
+        "behaviour of the dominant risk contributors."
+    )
+
+elif principal_risk == "Maximum drawdown":
+
+    conclusion = (
+        "The principal issue identified by the current "
+        "intelligence framework is downside exposure. "
+        "Historical drawdown indicates that the portfolio "
+        "has experienced material capital impairment during "
+        "the analysis period. Monitoring should therefore "
+        "focus on drawdown persistence, recovery conditions "
+        "and the assets responsible for downside risk."
+    )
+
+elif principal_risk == "Annualised volatility":
+
+    conclusion = (
+        "The principal issue identified by the current "
+        "intelligence framework is volatility. "
+        "The portfolio is experiencing a relatively elevated "
+        "level of return dispersion, increasing uncertainty "
+        "around portfolio outcomes and risk-adjusted performance."
+    )
+
+else:
+
+    conclusion = (
+        "The principal issue identified by the current "
+        "intelligence framework is liquidity stress. "
+        "Institutional attention should focus on the assets "
+        "exhibiting the greatest liquidity pressure and the "
+        "potential impact of deteriorating market conditions."
+    )
+
+
+st.info(
+    conclusion
+)
+
+
+# ============================================================
+# 26.15 MACHINE-READABLE EXECUTIVE EXPORT
+# ============================================================
+
+st.subheader(
+    "Executive Report Export"
+)
+
+
+report_rows = [
+
+    {
+        "Section": "Executive Status",
+        "Metric": "Portfolio Status",
+        "Value": portfolio_status,
+        "Assessment": portfolio_status
+    },
+
+    {
+        "Section": "Performance",
+        "Metric": "Total Return",
+        "Value": fmt_pct(total_return),
+        "Assessment": "Observed"
+    },
+
+    {
+        "Section": "Performance",
+        "Metric": "Annualised Return",
+        "Value": fmt_pct(annualized_return),
+        "Assessment": "Observed"
+    },
+
+    {
+        "Section": "Risk",
+        "Metric": "Annualised Volatility",
+        "Value": fmt_pct(annualized_volatility),
+        "Assessment": volatility_assessment
+    },
+
+    {
+        "Section": "Risk",
+        "Metric": "Maximum Drawdown",
+        "Value": fmt_pct(maximum_drawdown),
+        "Assessment": drawdown_assessment
+    },
+
+    {
+        "Section": "Risk",
+        "Metric": "Current Drawdown",
+        "Value": fmt_pct(current_drawdown),
+        "Assessment": "Current"
+    },
+
+    {
+        "Section": "Structural Risk",
+        "Metric": "Top-5 Risk Concentration",
+        "Value": fmt_pct(top_5_risk_share),
+        "Assessment": concentration_assessment
+    },
+
+    {
+        "Section": "Liquidity",
+        "Metric": "Portfolio Liquidity Stress",
+        "Value": fmt_score(liquidity_score),
+        "Assessment": liquidity_assessment
+    },
+
+    {
+        "Section": "Market Structure",
+        "Metric": "Average Absolute Correlation",
+        "Value": fmt_pct(
+            average_absolute_correlation
+        ),
+        "Assessment": (
+            "Elevated"
+            if average_absolute_correlation >= 0.50
+            else
+            "Moderate"
+            if average_absolute_correlation >= 0.30
+            else
+            "Contained"
+        )
+    },
+
+    {
+        "Section": "Alerts",
+        "Metric": "Active Alerts",
+        "Value": active_alert_count,
+        "Assessment": "Monitor"
+    },
+
+    {
+        "Section": "Alerts",
+        "Metric": "High Alerts",
+        "Value": high_alert_count,
+        "Assessment": "Priority"
+    },
+
+    {
+        "Section": "Alerts",
+        "Metric": "Critical Alerts",
+        "Value": critical_alert_count,
+        "Assessment": "Priority"
+    },
+
+    {
+        "Section": "Executive Intelligence",
+        "Metric": "Principal Risk",
+        "Value": principal_risk,
+        "Assessment": "Primary Attention Area"
+    }
+]
+
+
+institutional_report = pd.DataFrame(
+    report_rows
+)
+
+
+st.dataframe(
+    institutional_report,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# ============================================================
+# 26.16 CSV DOWNLOAD
+# ============================================================
+
 csv_report = (
-    executive_report
+    institutional_report
     .to_csv(
         index=False
     )
 )
 
+
 st.download_button(
-    label="Download Executive Report",
+    label="Download Institutional Intelligence Report",
     data=csv_report,
     file_name=(
-        "indigo_market_intelligence_report.csv"
+        "indigo_institutional_market_intelligence_report.csv"
     ),
     mime="text/csv",
+    use_container_width=True
+)
+
+
+# ============================================================
+# 26.17 FULL REPORT DOWNLOAD
+# ============================================================
+
+full_report_sections = []
+
+full_report_sections.append(
+    "INDIGO INSTITUTIONAL MARKET INTELLIGENCE REPORT"
+)
+
+full_report_sections.append(
+    "=" * 60
+)
+
+full_report_sections.append(
+    f"Portfolio Status: {portfolio_status}"
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "EXECUTIVE ASSESSMENT"
+)
+
+full_report_sections.append(
+    assessment_text
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "PERFORMANCE & RISK"
+)
+
+full_report_sections.append(
+    f"Total Return: {fmt_pct(total_return)}"
+)
+
+full_report_sections.append(
+    f"Annualised Return: {fmt_pct(annualized_return)}"
+)
+
+full_report_sections.append(
+    f"Annualised Volatility: {fmt_pct(annualized_volatility)}"
+)
+
+full_report_sections.append(
+    f"Maximum Drawdown: {fmt_pct(maximum_drawdown)}"
+)
+
+full_report_sections.append(
+    f"Current Drawdown: {fmt_pct(current_drawdown)}"
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "STRUCTURAL RISK"
+)
+
+full_report_sections.append(
+    f"Principal Risk: {principal_risk}"
+)
+
+full_report_sections.append(
+    f"Top-5 Risk Concentration: "
+    f"{fmt_pct(top_5_risk_share)}"
+)
+
+full_report_sections.append(
+    f"Average Absolute Correlation: "
+    f"{fmt_pct(average_absolute_correlation)}"
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "LIQUIDITY"
+)
+
+full_report_sections.append(
+    f"Portfolio Liquidity Stress: "
+    f"{fmt_score(liquidity_score)}"
+)
+
+full_report_sections.append(
+    f"Liquidity Assessment: "
+    f"{liquidity_assessment}"
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "ALERTS"
+)
+
+full_report_sections.append(
+    f"Active Alerts: {active_alert_count}"
+)
+
+full_report_sections.append(
+    f"High Alerts: {high_alert_count}"
+)
+
+full_report_sections.append(
+    f"Critical Alerts: {critical_alert_count}"
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "PRINCIPAL RISKS"
+)
+
+for risk in principal_risks:
+
+    full_report_sections.append(
+        f"- {risk}"
+    )
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "DECISION-ATTENTION QUEUE"
+)
+
+for action in decision_actions:
+
+    full_report_sections.append(
+        f"- {action}"
+    )
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "INSTITUTIONAL CONCLUSION"
+)
+
+full_report_sections.append(
+    conclusion
+)
+
+full_report_sections.append(
+    ""
+)
+
+full_report_sections.append(
+    "Generated by Indigo Market Intelligence V1."
+)
+
+full_report_sections.append(
+    "For analytical and decision-support purposes only."
+)
+
+
+full_report = "\n".join(
+    full_report_sections
+)
+
+
+st.download_button(
+    label="Download Executive Intelligence Brief",
+    data=full_report,
+    file_name=(
+        "indigo_executive_intelligence_brief.txt"
+    ),
+    mime="text/plain",
     use_container_width=True
 )
 
